@@ -91,8 +91,8 @@ if (dialect === 'sqlite') {
           expectation: "CREATE TABLE IF NOT EXISTS `myTable` (`title` VARCHAR(255), `name` VARCHAR(255));"
         },
         {
-          arguments: ['myTable', {title: 'VARCHAR(255) BINARY', number: 'INTEGER(5) UNSIGNED'}],
-          expectation: "CREATE TABLE IF NOT EXISTS `myTable` (`title` VARCHAR BINARY(255), `number` INTEGER UNSIGNED(5));"
+          arguments: ['myTable', {title: 'VARCHAR(255) BINARY', number: 'INTEGER(5) UNSIGNED', position: 'VARCHAR(5) UNIQUE'}],
+          expectation: "CREATE TABLE IF NOT EXISTS `myTable` (`title` VARCHAR BINARY(255), `number` INTEGER UNSIGNED(5), `position` VARCHAR(5) UNIQUE);"
         },
         {
           arguments: ['myTable', {title: 'ENUM("A", "B", "C")', name: 'VARCHAR(255)'}],
@@ -165,8 +165,8 @@ if (dialect === 'sqlite') {
         }, {
           title: 'functions can take functions as arguments',
           arguments: ['myTable', function (sequelize) {
-            return { 
-              order: [[sequelize.fn('f1', sequelize.fn('f2', sequelize.col('id'))), 'DESC']] 
+            return {
+              order: [[sequelize.fn('f1', sequelize.fn('f2', sequelize.col('id'))), 'DESC']]
             }
           }],
           expectation: "SELECT * FROM `myTable` ORDER BY f1(f2(`id`)) DESC;",
@@ -177,7 +177,7 @@ if (dialect === 'sqlite') {
           arguments: ['myTable', function (sequelize) {
             return {
               order: [
-                [sequelize.fn('f1', sequelize.col('myTable.id')), 'DESC'], 
+                [sequelize.fn('f1', sequelize.col('myTable.id')), 'DESC'],
                 [sequelize.fn('f2', 12, 'lalala', new Date(Date.UTC(2011, 2, 27, 10, 1, 55))), 'ASC']
               ]
             }
