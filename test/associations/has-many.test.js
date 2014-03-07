@@ -265,6 +265,40 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
       })
     })
 
+    describe('addAssociations', function() {
+      it('supports transactions', function(done) {
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var Article = sequelize.define('Article', { 'title': DataTypes.STRING })
+            , Label   = sequelize.define('Label', { 'text': DataTypes.STRING })
+
+          Article.hasMany(Label)
+
+          sequelize.sync({ force: true }).success(function() {
+            Article.create({ title: 'foo' }).success(function(article) {
+              Label.create({ text: 'bar' }).success(function(label) {
+                sequelize.transaction(function(t) {
+                  article.addLabel(label, { transaction: t }).success(function() {
+                    Label
+                      .findAll({ where: { ArticleId: article.id }, transaction: undefined })
+                      .success(function(labels) {
+                        expect(labels.length).to.equal(0)
+
+                        Label
+                          .findAll({ where: { ArticleId: article.id }, transaction: t })
+                          .success(function(labels) {
+                            expect(labels.length).to.equal(1)
+                            t.rollback().success(function() { done() })
+                          })
+                      })
+                  })
+                })
+              })
+            })
+          })
+        })
+      })
+    })
+
     it("clears associations when passing null to the set-method with omitNull set to true", function(done) {
       this.sequelize.options.omitNull = true
 
@@ -285,6 +319,59 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
                     task.getUsers().success(function(_users) {
                       expect(_users).to.have.length(0)
                       done()
+                    })
+                  })
+                })
+              })
+            })
+          })
+        })
+      })
+    })
+
+    describe('createAssociations', function() {
+      it('creates a new associated object', function(done) {
+        var Article = this.sequelize.define('Article', { 'title': DataTypes.STRING })
+          , Label   = this.sequelize.define('Label', { 'text': DataTypes.STRING })
+
+        Article.hasMany(Label)
+
+        Article.sync({ force: true }).success(function() {
+          Label.sync({ force: true }).success(function() {
+            Article.create({ title: 'foo' }).success(function(article) {
+              article.createLabel({ text: 'bar' }).success(function(label) {
+
+                Label
+                  .findAll({ where: { ArticleId: article.id }})
+                  .success(function(labels) {
+                    expect(labels.length).to.equal(1)
+                    done()
+                  })
+              })
+            })
+          })
+        })
+      })
+
+      it('supports transactions', function(done) {
+        var self = this
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var Article = sequelize.define('Article', { 'title': DataTypes.STRING })
+            , Label   = sequelize.define('Label', { 'text': DataTypes.STRING })
+
+          Article.hasMany(Label)
+
+          Article.sync({ force: true }).success(function() {
+            Label.sync({ force: true }).success(function() {
+              Article.create({ title: 'foo' }).success(function(article) {
+                sequelize.transaction(function (t) {
+                  article.createLabel({ text: 'bar' }, { transaction: t }).success(function(label) {
+                    Label.findAll({ where: { ArticleId: article.id }}).success(function(labels) {
+                      expect(labels.length).to.equal(0)
+                      Label.findAll({ where: { ArticleId: article.id }}, { transaction: t }).success(function(labels) {
+                        expect(labels.length).to.equal(1)
+                        t.rollback().success(function() { done() })
+                      })
                     })
                   })
                 })
@@ -429,6 +516,29 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
         })
       })
     }) // end optimization using bulk create, destroy and update
+
+    describe('selfAssociations', function () {
+      it('should work with alias', function (done) {
+        var Person = this.sequelize.define('Group', {})
+
+        Person.hasMany(Person, { as: 'Children'});
+
+        this.sequelize.sync().done(function (err) {
+          expect(err).not.to.be.ok
+          done()
+        })
+      })
+      it('should work with through', function (done) {
+        var Group = this.sequelize.define('Group', {})
+
+        Group.hasMany(Group, { through: 'groups_outsourcing_companies', as: 'OutsourcingCompanies'});
+
+        this.sequelize.sync().done(function (err) {
+          expect(err).not.to.be.ok
+          done()
+        })
+      })
+    })
   })
 
   describe('(N:M)', function() {
@@ -607,6 +717,90 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
       })
     })
 
+    describe('createAssociations', function() {
+      it('creates a new associated object', function(done) {
+        var User = this.sequelize.define('User', { username: DataTypes.STRING })
+          , Task = this.sequelize.define('Task', { title: DataTypes.STRING })
+
+        User.hasMany(Task)
+        Task.hasMany(User)
+
+        User.sync({ force: true }).success(function() {
+          Task.sync({ force: true }).success(function() {
+            Task.create({ title: 'task' }).success(function(task) {
+              task.createUser({ username: 'foo' }).success(function() {
+                task.getUsers().success(function(_users) {
+                  expect(_users).to.have.length(1)
+
+                  done()
+                })
+              })
+            })
+          })
+        })
+      })
+
+      it('supports transactions', function(done) {
+        var self = this
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var User = sequelize.define('User', { username: DataTypes.STRING })
+            , Task = sequelize.define('Task', { title: DataTypes.STRING })
+
+          User.hasMany(Task)
+          Task.hasMany(User)
+
+          User.sync({ force: true }).success(function() {
+            Task.sync({ force: true }).success(function() {
+              Task.create({ title: 'task' }).success(function(task) {
+                sequelize.transaction(function (t) {
+                  task.createUser({ username: 'foo' }, { transaction: t }).success(function() {
+                    task.getUsers().success(function(users) {
+                      expect(users).to.have.length(0)
+
+                      task.getUsers({ transaction: t }).success(function(users) {
+                        expect(users).to.have.length(1)
+                        t.rollback().success(function() { done() })
+                      })
+                    })
+                  })
+                })
+              })
+            })
+          })
+        })
+      })
+    })
+
+    describe('addAssociations', function() {
+      it('supports transactions', function(done) {
+        Support.prepareTransactionTest(this.sequelize, function(sequelize) {
+          var User = sequelize.define('User', { username: DataTypes.STRING })
+            , Task = sequelize.define('Task', { title: DataTypes.STRING })
+
+          User.hasMany(Task)
+          Task.hasMany(User)
+
+          sequelize.sync({ force: true }).success(function() {
+            User.create({ username: 'foo' }).success(function(user) {
+              Task.create({ title: 'task' }).success(function(task) {
+                sequelize.transaction(function(t){
+                  task.addUser(user, { transaction: t }).success(function() {
+                    task.hasUser(user).success(function(hasUser) {
+                      expect(hasUser).to.be.false
+                      task.hasUser(user, { transaction: t }).success(function(hasUser) {
+                        expect(hasUser).to.be.true
+                        t.rollback().success(function() { done() })
+                      })
+                    })
+                  })
+                })
+              })
+            })
+          })
+        })
+      })
+    })
+
     describe('optimizations using bulk create, destroy and update', function () {
       beforeEach(function (done) {
         var self = this
@@ -632,7 +826,7 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
             self.Task.create({ title: 'task2' }).success(function(task2) {
               user.setTasks([task1, task2]).on('sql', spy).on('sql', _.after(2, function (sql) {
                 expect(sql).to.have.string("INSERT INTO")
-                expect(sql).to.have.string("VALUES (1,1),(2,1)")
+                expect(sql).to.have.string("VALUES (1,1),(1,2)")
               })).success(function () {
                 expect(spy.calledTwice).to.be.ok
                 done()
@@ -676,10 +870,8 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
           { tableName: 'tasks' }
         )
 
-        this.User.hasMany(this.Task,
-          { joinTableName: 'user_has_tasks' }
-        )
-        this.Task.hasMany(this.User)
+        this.User.hasMany(this.Task, { joinTableName: 'user_has_tasks' })
+        this.Task.hasMany(this.User, { joinTableName: 'user_has_tasks' })
 
         this.User.sync({ force: true }).success(function() {
           self.Task.sync({force: true}).success(function() {
@@ -693,20 +885,68 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
           expect(associationName).not.to.equal(this.User.tableName)
           expect(associationName).not.to.equal(this.Task.tableName)
 
-          var joinTableName = this.User.associations[associationName].options.joinTableName
-          if (typeof joinTableName !== 'undefined') {
-            expect(joinTableName).to.equal(associationName)
+          var through = this.User.associations[associationName].through
+          if (typeof through !== 'undefined') {
+            expect(through.tableName).to.equal(associationName)
           }
           var tableName = this.User.associations[associationName].options.tableName
           if (typeof tableName !== 'undefined') {
             expect(tableName).to.equal(associationName)
           }
         }
-        done()
+        setTimeout(function () {
+          done()
+        }, 50)
       })
     })
+    
+    describe('primary key handling for join table', function () {
+      it('removes the primary key if it was added by sequelize', function () {
+        var self = this
+        this.UserTasks = this.sequelize.define('usertasks', {});
 
-    describe('join table model', function () {
+        this.User.hasMany(this.Task, { through: this.UserTasks })
+        this.Task.hasMany(this.User, { through: this.UserTasks })
+
+        expect(Object.keys(self.UserTasks.primaryKeys)).to.deep.equal(['taskId', 'userId'])
+      })
+
+      it('keeps the primary key if it was added by the user', function () {
+        var self = this
+          , fk
+         
+        this.UserTasks = this.sequelize.define('usertasks', {
+          id: {
+            type: Sequelize.INTEGER,
+            autoincrement: true,
+            primaryKey: true
+          }
+        });
+        this.UserTasks2 = this.sequelize.define('usertasks2', {
+          userTasksId: {
+            type: Sequelize.INTEGER,
+            autoincrement: true,
+            primaryKey: true
+          }
+        }); 
+
+        this.User.hasMany(this.Task, { through: this.UserTasks })
+        this.Task.hasMany(this.User, { through: this.UserTasks })
+ 
+        this.User.hasMany(this.Task, { through: this.UserTasks2 })
+        this.Task.hasMany(this.User, { through: this.UserTasks2 })
+ 
+        expect(Object.keys(self.UserTasks.primaryKeys)).to.deep.equal(['id'])
+        expect(Object.keys(self.UserTasks2.primaryKeys)).to.deep.equal(['userTasksId'])
+
+        _.each([self.UserTasks, self.UserTasks2], function (model) {
+          fk = Object.keys(model.options.uniqueKeys)[0]
+          expect(model.options.uniqueKeys[fk].fields).to.deep.equal([ 'taskId', 'userId' ])
+        })
+      })
+    })
+    
+    describe('through', function () {
       beforeEach(function (done) {
         this.User = this.sequelize.define('User', {})
         this.Project = this.sequelize.define('Project', {})
@@ -766,8 +1006,6 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
       })
 
       describe('inserting in join table', function () {
-
-
         describe('add', function () {
           it('should insert data provided on the object into the join table', function (done) {
             var self = this
@@ -800,6 +1038,79 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
               })
             })
           })
+
+          it('should be able to add twice (second call result in UPDATE call) without any attributes (and timestamps off) on the through model', function (done) {
+            var Worker = this.sequelize.define('Worker', {}, {timestamps: false})
+              , Task = this.sequelize.define('Task', {}, {timestamps: false})
+              , WorkerTasks = this.sequelize.define('WorkerTasks', {}, {timestamps: false})
+
+            Worker.hasMany(Task, { through: WorkerTasks })
+            Task.hasMany(Worker, { through: WorkerTasks })
+
+            this.sequelize.sync().done(function(err) {
+              expect(err).not.to.be.ok
+              Worker.create({id: 1337}).done(function (err, worker) {
+                expect(err).not.to.be.ok
+                Task.create({id: 7331}).done(function (err, task) {
+                  expect(err).not.to.be.ok
+                  worker.addTask(task).done(function (err) {
+                    expect(err).not.to.be.ok
+                    worker.addTask(task).done(function (err) {
+                      expect(err).not.to.be.ok
+                      done()
+                    })
+                  })
+                })
+              })
+            })
+          })
+
+          it('should be able to add twice (second call result in UPDATE call) with custom primary keys and without any attributes (and timestamps off) on the through model', function (done) {
+            var Worker = this.sequelize.define('Worker', {
+                id: {
+                  type: DataTypes.INTEGER,
+                  allowNull: false,
+                  primaryKey: true,
+                  autoIncrement: true
+                }
+              }, {timestamps: false})
+              , Task = this.sequelize.define('Task', {
+                id: {
+                  type: DataTypes.INTEGER,
+                  allowNull: false,
+                  primaryKey: true,
+                  autoIncrement: true
+                }
+              }, {timestamps: false})
+              , WorkerTasks = this.sequelize.define('WorkerTasks', {
+                id: {
+                  type: DataTypes.INTEGER,
+                  allowNull: false,
+                  primaryKey: true,
+                  autoIncrement: true
+                }
+              }, {timestamps: false})
+
+            Worker.hasMany(Task, { through: WorkerTasks })
+            Task.hasMany(Worker, { through: WorkerTasks })
+
+            this.sequelize.sync().done(function(err) {
+              expect(err).not.to.be.ok
+              Worker.create({id: 1337}).done(function (err, worker) {
+                expect(err).not.to.be.ok
+                Task.create({id: 7331}).done(function (err, task) {
+                  expect(err).not.to.be.ok
+                  worker.addTask(task).done(function (err) {
+                    expect(err).not.to.be.ok
+                    worker.addTask(task).done(function (err) {
+                      expect(err).not.to.be.ok
+                      done()
+                    })
+                  })
+                })
+              })
+            })
+          })
         })
 
         describe('set', function () {
@@ -826,6 +1137,68 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
                     self.UserProjects.find({ where: { UserId: u.id, ProjectId: p2.id }}).success(function (up) {
                       expect(up.status).to.equal('active')
                       _done()
+                    })
+                  })
+                })
+              })
+            })
+          })
+
+          it('should be able to set twice (second call result in UPDATE calls) without any attributes (and timestamps off) on the through model', function (done) {
+            var Worker = this.sequelize.define('Worker', {}, {timestamps: false})
+              , Task = this.sequelize.define('Task', {}, {timestamps: false})
+              , WorkerTasks = this.sequelize.define('WorkerTasks', {}, {timestamps: false})
+
+            Worker.hasMany(Task, { through: WorkerTasks })
+            Task.hasMany(Worker, { through: WorkerTasks })
+
+            this.sequelize.sync().done(function(err) {
+              expect(err).not.to.be.ok
+              Worker.create().done(function (err, worker) {
+                expect(err).not.to.be.ok
+                Task.bulkCreate([{}, {}]).done(function (err) {
+                  expect(err).not.to.be.ok
+                  Task.findAll().done(function (err, tasks) {
+                    expect(err).not.to.be.ok
+                    worker.setTasks(tasks).done(function (err) {
+                      worker.setTasks(tasks).done(function (err) {
+                        expect(err).not.to.be.ok
+                        done()
+                      })
+                    })
+                  })
+                })
+              })
+            })
+          })
+        })
+      })
+
+      describe('removing from the join table', function () {
+        it('should remove a single entry without any attributes (and timestamps off) on the through model', function (done) {
+          var Worker = this.sequelize.define('Worker', {}, {timestamps: false})
+            , Task = this.sequelize.define('Task', {}, {timestamps: false})
+            , WorkerTasks = this.sequelize.define('WorkerTasks', {}, {timestamps: false})
+
+          Worker.hasMany(Task, { through: WorkerTasks })
+          Task.hasMany(Worker, { through: WorkerTasks })
+
+          this.sequelize.sync().done(function(err) {
+            expect(err).not.to.be.ok
+            Worker.create({}).done(function (err, worker) {
+              expect(err).not.to.be.ok
+              Task.bulkCreate([{}, {}]).done(function (err) {
+                expect(err).not.to.be.ok
+                Task.findAll().done(function (err, tasks) {
+                  expect(err).not.to.be.ok
+                  worker.setTasks(tasks).done(function (err) {
+                    worker.removeTask(tasks[0]).done(function (err) {
+                      expect(err).not.to.be.ok
+
+                      worker.getTasks().done(function (err, tasks) {
+                        expect(tasks.length).to.equal(1)
+                        done()
+                      })
                     })
                   })
                 })
@@ -898,6 +1271,77 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
               done()
             })
         })
+      })
+    })
+
+    describe('alias', function () {
+      it("creates the join table when through is a string", function (done) {
+        var self = this
+          , User = this.sequelize.define('User', {})
+          , Group = this.sequelize.define('Group', {})
+
+        User.hasMany(Group, { as: 'MyGroups', through: 'group_user'})
+        Group.hasMany(User, { as: 'MyUsers', through: 'group_user'})
+
+        this.sequelize.sync({force:true}).success(function () {
+          self.sequelize.getQueryInterface().showAllTables().success(function (result) {
+             expect(result.indexOf('group_user')).not.to.equal(-1)
+             done()
+          })
+        })
+      })
+
+      it("creates the join table when through is a model", function (done) {
+        var self = this
+          , User = this.sequelize.define('User', {})
+          , Group = this.sequelize.define('Group', {})
+          , UserGroup = this.sequelize.define('GroupUser', {}, {tableName: 'user_groups'})
+
+        User.hasMany(Group, { as: 'MyGroups', through: UserGroup})
+        Group.hasMany(User, { as: 'MyUsers', through: UserGroup})
+
+        this.sequelize.sync({force:true}).success(function () {
+           self.sequelize.getQueryInterface().showAllTables().success(function (result) {
+             expect(result.indexOf('user_groups')).not.to.equal(-1)
+             done()
+          })
+        })
+      })
+
+      it("correctly identifies its counterpart when through is a string", function (done) {
+        var self = this
+          , User = this.sequelize.define('User', {})
+          , Group = this.sequelize.define('Group', {})
+
+        User.hasMany(Group, { as: 'MyGroups', through: 'group_user'})
+        Group.hasMany(User, { as: 'MyUsers', through: 'group_user'})
+
+        expect(Group.associations.MyUsers.through === User.associations.MyGroups.through);
+        expect(Group.associations.MyUsers.through.rawAttributes.UserId).to.exist;
+        expect(Group.associations.MyUsers.through.rawAttributes.GroupId).to.exist;
+
+        setTimeout(function () {
+          done()
+        }, 50)
+      })
+
+      it("correctly identifies its counterpart when through is a model", function (done) {
+        var self = this
+          , User = this.sequelize.define('User', {})
+          , Group = this.sequelize.define('Group', {})
+          , UserGroup = this.sequelize.define('GroupUser', {}, {tableName: 'user_groups'})
+
+        User.hasMany(Group, { as: 'MyGroups', through: UserGroup})
+        Group.hasMany(User, { as: 'MyUsers', through: UserGroup})
+
+        expect(Group.associations.MyUsers.through === User.associations.MyGroups.through);
+
+        expect(Group.associations.MyUsers.through.rawAttributes.UserId).to.exist;
+        expect(Group.associations.MyUsers.through.rawAttributes.GroupId).to.exist;
+
+        setTimeout(function () {
+          done()
+        }, 50)
       })
     })
   })
@@ -992,7 +1436,7 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
                 // the `UPDATE` query generated by `save()` uses `id` in the
                 // `WHERE` clause
 
-                var tableName = user.QueryInterface.QueryGenerator.addSchema(user.__factory)
+                var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
                 user.QueryInterface.update(user, tableName, {id: 999}, user.id)
                 .success(function() {
                   Task.findAll().success(function(tasks) {
@@ -1024,7 +1468,7 @@ describe(Support.getTestDialectTeaser("HasMany"), function() {
                 // the `UPDATE` query generated by `save()` uses `id` in the
                 // `WHERE` clause
 
-                var tableName = user.QueryInterface.QueryGenerator.addSchema(user.__factory)
+                var tableName = user.QueryInterface.QueryGenerator.addSchema(user.Model)
                 user.QueryInterface.update(user, tableName, {id: 999}, user.id)
                 .error(function() {
                   // Should fail due to FK restriction

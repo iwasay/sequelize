@@ -223,6 +223,30 @@ if (dialect === 'sqlite') {
           expectation: "SELECT * FROM `myTable` GROUP BY name ORDER BY id DESC;",
           context: QueryGenerator
         }, {
+          title: 'HAVING clause works with string replacements',
+          arguments: ['myTable', function (sequelize) {
+            return {
+              attributes: ['*', [sequelize.fn('YEAR', sequelize.col('createdAt')), 'creationYear']],
+              group: ['creationYear', 'title'],
+              having: ['creationYear > ?', 2002]
+            }
+          }],
+          expectation: "SELECT *, YEAR(`createdAt`) as `creationYear` FROM `myTable` GROUP BY `creationYear`, `title` HAVING creationYear > 2002;",
+          context: QueryGenerator,
+          needsSequelize: true
+        }, {
+          title: 'HAVING clause works with where-like hash',
+          arguments: ['myTable', function (sequelize) {
+            return {
+              attributes: ['*', [sequelize.fn('YEAR', sequelize.col('createdAt')), 'creationYear']],
+              group: ['creationYear', 'title'],
+              having: { creationYear: { gt: 2002 } }
+            }
+          }],
+          expectation: "SELECT *, YEAR(`createdAt`) as `creationYear` FROM `myTable` GROUP BY `creationYear`, `title` HAVING `creationYear` > 2002;",
+          context: QueryGenerator,
+          needsSequelize: true
+        }, {
           arguments: ['myTable', {limit: 10}],
           expectation: "SELECT * FROM `myTable` LIMIT 10;",
           context: QueryGenerator
@@ -254,6 +278,21 @@ if (dialect === 'sqlite') {
           title: 'no where arguments (null)',
           arguments: ['myTable', {where: null}],
           expectation: "SELECT * FROM `myTable` WHERE 1=1;",
+          context: QueryGenerator
+        }, {
+          title: 'buffer as where argument',
+          arguments: ['myTable', {where: { field: new Buffer("Sequelize")}}],
+          expectation: "SELECT * FROM `myTable` WHERE `myTable`.`field`=X'53657175656c697a65';",
+          context: QueryGenerator
+        }, {
+          title: 'use != if ne !== null',
+          arguments: ['myTable', {where: {field: {ne: 0}}}],
+          expectation: "SELECT * FROM `myTable` WHERE `myTable`.`field` != 0;",
+          context: QueryGenerator
+        }, {
+          title: 'use IS NOT if ne === null',
+          arguments: ['myTable', {where: {field: {ne: null}}}],
+          expectation: "SELECT * FROM `myTable` WHERE `myTable`.`field` IS NOT NULL;",
           context: QueryGenerator
         }
       ],
@@ -346,6 +385,9 @@ if (dialect === 'sqlite') {
           arguments: ['myTable', [{name: 'foo', foo: 1, nullValue: null}, {name: 'bar', foo: 2, nullValue: null}]],
           expectation: "INSERT INTO `myTable` (`name`,`foo`,`nullValue`) VALUES ('foo',1,NULL),('bar',2,NULL);",
           context: {options: {omitNull: true}} // Note: As above
+        }, {
+          arguments: ['myTable', [{name: 'foo'}, {name: 'bar'}], {ignoreDuplicates: true}],
+          expectation: "INSERT OR IGNORE INTO `myTable` (`name`) VALUES ('foo'),('bar');"
         }
       ],
 
@@ -439,6 +481,7 @@ if (dialect === 'sqlite') {
               test.arguments[1] = test.arguments[1](this.sequelize)
             }
             QueryGenerator.options = context.options
+            QueryGenerator._dialect = this.sequelize.dialect
             var conditions = QueryGenerator[suiteTitle].apply(QueryGenerator, test.arguments)
             expect(conditions).to.deep.equal(test.expectation)
             done()

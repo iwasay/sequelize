@@ -45,18 +45,15 @@ var Support = {
     var config = Config[options.dialect]
 
     options.logging = (options.hasOwnProperty('logging') ? options.logging : false)
-    options.pool    = options.pool || config.pool
+    options.pool    = options.pool !== undefined ? options.pool : config.pool
 
     var sequelizeOptions = {
+      host:           options.host || config.host,
       logging:        options.logging,
       dialect:        options.dialect,
       port:           options.port || process.env.SEQ_PORT || config.port,
       pool:           options.pool,
       dialectOptions: options.dialectOptions || {}
-    }
-
-    if (!!options.host) {
-      sequelizeOptions.host = options.host
     }
 
     if (!!options.define) {
@@ -86,9 +83,18 @@ var Support = {
       .dropAllTables()
       .success(function() {
         sequelize.daoFactoryManager.daos = []
-        callback && callback()
+
+        sequelize
+          .getQueryInterface()
+          .dropAllEnums()
+            .success(callback)
+            .error(function (err) {
+              console.log('Error in support.clearDatabase() dropAllEnums() :: ', err)
+            })
       })
-      .error(function(err) { console.log(err) })
+      .error(function(err) {
+        console.log('Error in support.clearDatabase() dropAllTables() :: ', err)
+      })
   },
 
   getSupportedDialects: function() {
@@ -140,6 +146,19 @@ var Support = {
     }
 
     return "[" + dialect.toUpperCase() + "] " + moduleName
+  },
+
+  getTestUrl: function(config) {
+    var url,
+        dbConfig = config[config.dialect];
+
+    if (config.dialect === 'sqlite') {
+      url = 'sqlite://' + dbConfig.storage;
+    } else {
+      url = config.dialect + "://" + dbConfig.username
+      + "@" + dbConfig.host + ":" + dbConfig.port + "/" + dbConfig.database;
+    }
+    return url;
   }
 }
 

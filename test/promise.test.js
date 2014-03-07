@@ -199,7 +199,7 @@ describe(Support.getTestDialectTeaser("Promise"), function () {
               expect(updatedUser.username).to.equal('Doe John')
               done()
             })
-      })
+        })
     })
 
 
@@ -243,13 +243,13 @@ describe(Support.getTestDialectTeaser("Promise"), function () {
                                   expect(leBook.pages[0].content).to.equal('something totally different')
                                   expect(page.content).to.equal('something totally different')
                                   done()
-                              })
+                                })
                             })
                         })
                     })
-            })
-        }, done)
-      })
+                })
+            }, done)
+        })
     })
   })
 
@@ -277,7 +277,7 @@ describe(Support.getTestDialectTeaser("Promise"), function () {
         expect(err).to.be.an("object")
         expect(err.validateTest).to.be.an("array")
         expect(err.validateTest[0]).to.be.ok
-        expect(err.validateTest[0].indexOf('Invalid integer')).to.be.greaterThan(-1)
+        expect(err.validateTest[0]).to.equal('Validation isInt failed')
         done()
       });
     })
@@ -304,9 +304,57 @@ describe(Support.getTestDialectTeaser("Promise"), function () {
         expect(err.validateTest).to.be.ok
         expect(err.validateTest).to.be.an("array")
         expect(err.validateTest[0]).to.be.ok
-        expect(err.validateTest[0].indexOf('Invalid integer')).to.be.greaterThan(-1)
+        expect(err.validateTest[0]).to.equal('Validation isInt failed')
         done()
       })
     })
+  })
+
+  describe('findOrCreate', function () {
+    beforeEach(function(done) {
+      this.User.create({ id: 1, aNumber: 0, bNumber: 0 }).done(done)
+    })
+
+    it('with then', function (done) {
+      this.User
+        .findOrCreate({ id: 1})
+        .then(function(user) {
+          expect(user.id).to.equal(1)
+          expect(arguments.length).to.equal(1)
+          done()
+        })      
+    })
+
+    describe('with spread', function () {
+      it('user not created', function (done) {
+        this.User
+          .findOrCreate({ id: 1})
+          .spread(function(user, created) {
+            expect(user.id).to.equal(1)
+            expect(created).to.equal(false)
+            expect(arguments.length).to.equal(2)
+            done()
+          })      
+      })
+      it('user created', function (done) {
+        this.User
+          .findOrCreate({ id: 2})
+          .spread(function(user, created) {
+            expect(user.id).to.equal(2)
+            expect(created).to.equal(true)
+            expect(arguments.length).to.equal(2)
+            done()
+          })      
+      })
+      it('works for functions with only one return value', function (done) {
+        this.User
+          .find({ id: 1})
+          .spread(function(user) {
+            expect(user.id).to.equal(1)
+            expect(arguments.length).to.equal(1)
+            done()
+          })    
+      })
+    })    
   })
 })

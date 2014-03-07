@@ -236,6 +236,30 @@ if (Support.dialectIsMySQL()) {
           expectation: "SELECT * FROM `myTable` GROUP BY name ORDER BY id DESC;",
           context: QueryGenerator
         }, {
+          title: 'HAVING clause works with string replacements',
+          arguments: ['myTable', function (sequelize) {
+            return {
+              attributes: ['*', [sequelize.fn('YEAR', sequelize.col('createdAt')), 'creationYear']],
+              group: ['creationYear', 'title'],
+              having: ['creationYear > ?', 2002]
+            }
+          }],
+          expectation: "SELECT *, YEAR(`createdAt`) as `creationYear` FROM `myTable` GROUP BY `creationYear`, `title` HAVING creationYear > 2002;",
+          context: QueryGenerator,
+          needsSequelize: true
+        }, {
+          title: 'HAVING clause works with where-like hash',
+          arguments: ['myTable', function (sequelize) {
+            return {
+              attributes: ['*', [sequelize.fn('YEAR', sequelize.col('createdAt')), 'creationYear']],
+              group: ['creationYear', 'title'],
+              having: { creationYear: { gt: 2002 } }
+            }
+          }],
+          expectation: "SELECT *, YEAR(`createdAt`) as `creationYear` FROM `myTable` GROUP BY `creationYear`, `title` HAVING `creationYear` > 2002;",
+          context: QueryGenerator,
+          needsSequelize: true
+        }, {
           arguments: ['myTable', {limit: 10}],
           expectation: "SELECT * FROM `myTable` LIMIT 10;",
           context: QueryGenerator
@@ -267,6 +291,21 @@ if (Support.dialectIsMySQL()) {
           title: 'no where arguments (null)',
           arguments: ['myTable', {where: null}],
           expectation: "SELECT * FROM `myTable` WHERE 1=1;",
+          context: QueryGenerator
+        }, {
+          title: 'buffer as where argument',
+          arguments: ['myTable', {where: { field: new Buffer("Sequelize")}}],
+          expectation: "SELECT * FROM `myTable` WHERE `myTable`.`field`=X'53657175656c697a65';",
+          context: QueryGenerator
+        }, {
+          title: 'use != if ne !== null',
+          arguments: ['myTable', {where: {field: {ne: 0}}}],
+          expectation: "SELECT * FROM `myTable` WHERE `myTable`.`field` != 0;",
+          context: QueryGenerator
+        }, {
+          title: 'use IS NOT if ne === null',
+          arguments: ['myTable', {where: {field: {ne: null}}}],
+          expectation: "SELECT * FROM `myTable` WHERE `myTable`.`field` IS NOT NULL;",
           context: QueryGenerator
         }
       ],
@@ -334,7 +373,7 @@ if (Support.dialectIsMySQL()) {
           expectation: "INSERT INTO `myTable` (`name`,`foo`) VALUES ('foo',1),('bar',2);"
         }, {
           arguments: ['myTable', [{name: 'foo', foo: 1, nullValue: null}, {name: 'bar', nullValue: null}]],
-          expectation: "INSERT INTO `myTable` (`name`,`foo`,`nullValue`) VALUES ('foo',1,NULL),('bar',NULL);"
+          expectation: "INSERT INTO `myTable` (`name`,`foo`,`nullValue`) VALUES ('foo',1,NULL),('bar',NULL,NULL);"
         }, {
           arguments: ['myTable', [{name: 'foo', foo: 1, nullValue: null}, {name: 'bar', foo: 2, nullValue: null}]],
           expectation: "INSERT INTO `myTable` (`name`,`foo`,`nullValue`) VALUES ('foo',1,NULL),('bar',2,NULL);",
@@ -345,11 +384,14 @@ if (Support.dialectIsMySQL()) {
           context: {options: {omitNull: true}} // Note: We don't honour this because it makes little sense when some rows may have nulls and others not
         }, {
           arguments: ['myTable', [{name: 'foo', foo: 1, nullValue: undefined}, {name: 'bar', foo: 2, undefinedValue: undefined}]],
-          expectation: "INSERT INTO `myTable` (`name`,`foo`,`nullValue`) VALUES ('foo',1,NULL),('bar',2,NULL);",
+          expectation: "INSERT INTO `myTable` (`name`,`foo`,`nullValue`,`undefinedValue`) VALUES ('foo',1,NULL,NULL),('bar',2,NULL,NULL);",
           context: {options: {omitNull: true}} // Note: As above
         }, {
           arguments: ['myTable', [{name: "foo", value: true}, {name: 'bar', value: false}]],
           expectation: "INSERT INTO `myTable` (`name`,`value`) VALUES ('foo',true),('bar',false);"
+        }, {
+          arguments: ['myTable', [{name: 'foo'}, {name: 'bar'}], {ignoreDuplicates: true}],
+          expectation: "INSERT IGNORE INTO `myTable` (`name`) VALUES ('foo'),('bar');"
         }
       ],
 
@@ -430,7 +472,7 @@ if (Support.dialectIsMySQL()) {
       addIndexQuery: [
         {
           arguments: ['User', ['username', 'isAdmin']],
-          expectation: 'CREATE INDEX user_username_is_admin ON User (username, isAdmin)'
+          expectation: 'CREATE INDEX user_username_is_admin ON User (`username`, `isAdmin`)'
         }, {
           arguments: [
             'User', [
@@ -438,12 +480,12 @@ if (Support.dialectIsMySQL()) {
               'isAdmin'
             ]
           ],
-          expectation: "CREATE INDEX user_username_is_admin ON User (username(10) ASC, isAdmin)"
+          expectation: "CREATE INDEX user_username_is_admin ON User (`username`(10) ASC, `isAdmin`)"
         }, {
           arguments: [
             'User', ['username', 'isAdmin'], { parser: 'foo', indicesType: 'FULLTEXT', indexName: 'bar'}
           ],
-          expectation: "CREATE FULLTEXT INDEX bar ON User (username, isAdmin) WITH PARSER foo"
+          expectation: "CREATE FULLTEXT INDEX bar ON User (`username`, `isAdmin`) WITH PARSER foo"
         }
       ],
 
@@ -511,6 +553,7 @@ if (Support.dialectIsMySQL()) {
               test.arguments[1] = test.arguments[1](this.sequelize)
             }
             QueryGenerator.options = context.options
+            QueryGenerator._dialect = this.sequelize.dialect
             var conditions = QueryGenerator[suiteTitle].apply(QueryGenerator, test.arguments)
             expect(conditions).to.deep.equal(test.expectation)
             done()

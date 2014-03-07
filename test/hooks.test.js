@@ -4,6 +4,8 @@ var chai      = require('chai')
   , Support   = require(__dirname + '/support')
   , DataTypes = require(__dirname + '/../lib/data-types')
   , _         = require('lodash')
+  , Sequelize = Support.Sequelize
+  , sinon     = require('sinon')
 
 chai.Assertion.includeStack = true
 
@@ -111,7 +113,7 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
 
                     self.User.all().success(function(users) {
                       expect(users[0].mood).to.equal('happy')
-                      expect(users[0].mood).to.equal('happy')
+                      expect(users[1].mood).to.equal('happy')
                       done()
                     })
                   })
@@ -461,7 +463,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
             describe('#create', function() {
               it('should return an error based on user', function(done) {
                 this.User.create({mood: 'happy'}).error(function(err) {
-                  expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                  expect(err).to.be.instanceOf(Error);
+                  expect(err.mood).to.deep.equal([ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ])
                   done()
                 })
               })
@@ -497,7 +500,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
             describe('#create', function() {
               it('should return an error based on the hook', function(done) {
                 this.User.create({mood: 'happy'}).error(function(err) {
-                  expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                  expect(err).to.be.instanceOf(Error);
+                  expect(err.mood).to.deep.equal([ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ])
                   done()
                 })
               })
@@ -547,7 +551,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
             describe('#create', function() {
               it('should return an error based on user', function(done) {
                 this.User.create({mood: 'happy'}).error(function(err) {
-                  expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                  expect(err).to.be.instanceOf(Error);
+                  expect(err.mood).to.deep.equal([ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ])
                   done()
                 })
               })
@@ -595,7 +600,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
             describe('#create', function() {
               it('should return an error based on the hook', function(done) {
                 this.User.create({mood: 'happy'}).error(function(err) {
-                  expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                  expect(err).to.be.instanceOf(Error);
+                  expect(err.mood).to.deep.equal([ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ])
                   done()
                 })
               })
@@ -691,7 +697,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
               describe('#create', function() {
                 it('should return the user from the callback', function(done) {
                   this.User.create({mood: 'happy'}).error(function(err) {
-                    expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                    expect(err).to.be.instanceOf(Error);
+                    expect(err.mood).to.deep.equal([ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ])
                     done()
                   })
                 })
@@ -712,7 +719,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
               describe('#create', function() {
                 it('should return the error without the user within callback', function(done) {
                   this.User.create({mood: 'happy'}).error(function(err) {
-                    expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                    expect(err).to.be.instanceOf(Error);
+                    expect(err.mood).to.deep.equal([ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ])
                     done()
                   })
                 })
@@ -826,7 +834,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
 
               it('#create', function(done) {
                 this.User.create({mood: 'creative'}).error(function(err) {
-                  expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                  expect(err).to.be.instanceOf(Error);
+                  expect(err.mood).to.deep.equal( [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] )
                   done()
                 })
               })
@@ -849,7 +858,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
 
               it('#create', function(done) {
                 this.User.create({mood: 'happy'}).error(function(err) {
-                  expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                  expect(err).to.be.instanceOf(Error);
+                  expect(err.mood).to.deep.equal( [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] )
                   done()
                 })
               })
@@ -929,7 +939,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
               })
 
               this.User.create({mood: 'happy'}).error(function(err) {
-                expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                expect(err).to.be.instanceOf(Error);
+                expect(err.mood).to.deep.equal( [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] )
                 done()
               })
             })
@@ -942,7 +953,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
               })
 
               this.User.create({mood: 'happy'}).error(function(err) {
-                expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                expect(err).to.be.instanceOf(Error);
+                expect(err.mood).to.deep.equal( [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] )
                 done()
               })
             })
@@ -1048,7 +1060,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
 
               it('#create', function(done) {
                 this.User.create({mood: 'creative'}).error(function(err) {
-                  expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                  expect(err).to.be.instanceOf(Error);
+                  expect(err.mood).to.deep.equal( [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] )
                   done()
                 })
               })
@@ -1071,7 +1084,8 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
 
               it('#create', function(done) {
                 this.User.create({mood: 'happy'}).error(function(err) {
-                  expect(err).to.deep.equal({ mood: [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] })
+                  expect(err).to.be.instanceOf(Error);
+                  expect(err.mood).to.deep.equal( [ 'Value "ecstatic" for ENUM mood is out of allowed scope. Allowed values: happy, sad, neutral' ] )
                   done()
                 })
               })
@@ -1105,7 +1119,7 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
   })
 
   describe('#create', function() {
-    describe('via deifne', function() {
+    describe('via define', function() {
       describe('on success', function() {
         describe('with a single hook', function() {
           it('should return the user from the callback', function(done) {
@@ -1866,10 +1880,47 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
         })
       })
     })
+
+    it('should not trigger hooks on parent when using N:M association setters', function (done) {
+      var A = this.sequelize.define('A', {
+        name: Sequelize.STRING
+      })
+      var B = this.sequelize.define('B', {
+        name: Sequelize.STRING
+      })
+
+      var hookCalled = 0
+
+      A.addHook('afterCreate', function (instance, next) {
+        hookCalled++
+        next()
+      })
+
+      B.hasMany(A)
+      A.hasMany(B)
+
+      this.sequelize.sync({force: true}).done(function (err) {
+        expect(err).not.to.be.ok
+
+        var chainer = new Sequelize.Utils.QueryChainer([
+          A.create({name: 'a'}),
+          B.create({name: 'b'})
+        ])
+
+        chainer.run().done(function (err, res, a, b) {
+          expect(err).not.to.be.ok
+          a.addB(b).done(function (err) {
+            expect(err).not.to.be.ok
+            expect(hookCalled).to.equal(1)
+            done()
+          })
+        })
+      })
+    })
   })
 
   describe('#updateAttributes', function() {
-    describe('via deifne', function() {
+    describe('via define', function() {
       describe('on success', function() {
         describe('with a single hook', function() {
           it('should return the user from the callback', function(done) {
@@ -1987,7 +2038,7 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
 
             User.sync({ force: true }).success(function() {
               User.create({username: 'Cheech', mood: 'sad'}).success(function(user) {
-                user.updateAttributes({username: 'Chong'}).success(function(user) {
+                user.updateAttributes({username: 'Chong'}).done(function(err, user) {
                   expect(user.username).to.equal('Chong')
                   expect(user.mood).to.equal('happy')
                   expect(beforeHook).to.be.true
@@ -6988,6 +7039,170 @@ describe(Support.getTestDialectTeaser("Hooks"), function () {
                   done()
                 })
               })
+            })
+          })
+        })
+      })
+    })
+  })
+
+  describe('passing DAO instances', function() {
+
+    describe('beforeValidate / afterValidate', function() {
+      it('should pass a DAO instance to the hook', function(done){
+        var beforeHooked = false
+        var afterHooked = false
+        var User = this.sequelize.define('User', {
+          username: DataTypes.STRING
+        }, {
+          hooks: {
+            beforeValidate: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              beforeHooked = true
+              fn()
+            },
+            afterValidate: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              afterHooked = true
+              fn()
+            }
+          }
+        })
+
+        User.sync({ force: true }).success(function() {
+          User.create({ username: 'bob' }).success(function(user) {
+            expect(beforeHooked).to.be.true
+            expect(afterHooked).to.be.true
+            done()
+          })
+        })
+      })
+    })
+
+    describe('beforeCreate / afterCreate', function() {
+      it('should pass a DAO instance to the hook', function(done){
+        var beforeHooked = false
+        var afterHooked = false
+        var User = this.sequelize.define('User', {
+          username: DataTypes.STRING
+        }, {
+          hooks: {
+            beforeCreate: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              beforeHooked = true
+              fn()
+            },
+            afterCreate: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              afterHooked = true
+              fn()
+            }
+          }
+        })
+
+        User.sync({ force: true }).success(function() {
+          User.create({ username: 'bob' }).success(function(user) {
+            expect(beforeHooked).to.be.true
+            expect(afterHooked).to.be.true
+            done()
+          })
+        })
+      })
+    })
+
+    describe('beforeDestroy / afterDestroy', function() {
+      it('should pass a DAO instance to the hook', function(done){
+        var beforeHooked = false
+        var afterHooked = false
+        var User = this.sequelize.define('User', {
+          username: DataTypes.STRING
+        }, {
+          hooks: {
+            beforeDestroy: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              beforeHooked = true
+              fn()
+            },
+            afterDestroy: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              afterHooked = true
+              fn()
+            }
+          }
+        })
+
+        User.sync({ force: true }).success(function() {
+          User.create({ username: 'bob' }).success(function(user) {
+            user.destroy().success(function() {
+              expect(beforeHooked).to.be.true
+              expect(afterHooked).to.be.true
+              done()
+            })
+          })
+        })
+      })
+    })
+
+    describe('beforeDelete / afterDelete', function() {
+      it('should pass a DAO instance to the hook', function(done){
+        var beforeHooked = false
+        var afterHooked = false
+        var User = this.sequelize.define('User', {
+          username: DataTypes.STRING
+        }, {
+          hooks: {
+            beforeDelete: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              beforeHooked = true
+              fn()
+            },
+            afterDelete: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              afterHooked = true
+              fn()
+            }
+          }
+        })
+
+        User.sync({ force: true }).success(function() {
+          User.create({ username: 'bob' }).success(function(user) {
+            user.destroy().success(function() {
+              expect(beforeHooked).to.be.true
+              expect(afterHooked).to.be.true
+              done()
+            })
+          })
+        })
+      })
+    })
+
+    describe('beforeUpdate / afterUpdate', function() {
+      it('should pass a DAO instance to the hook', function(done){
+        var beforeHooked = false
+        var afterHooked = false
+        var User = this.sequelize.define('User', {
+          username: DataTypes.STRING
+        }, {
+          hooks: {
+            beforeUpdate: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              beforeHooked = true
+              fn()
+            },
+            afterUpdate: function(user, fn) {
+              expect(user).to.be.instanceof(User.DAO)
+              afterHooked = true
+              fn()
+            }
+          }
+        })
+
+        User.sync({ force: true }).success(function() {
+          User.create({ username: 'bob' }).success(function(user) {
+            user.save({ username: 'bawb' }).success(function() {
+              expect(beforeHooked).to.be.true
+              expect(afterHooked).to.be.true
+              done()
             })
           })
         })

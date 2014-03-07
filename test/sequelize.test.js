@@ -40,6 +40,18 @@ describe(Support.getTestDialectTeaser("Sequelize"), function () {
       expect(sequelize.config.host).to.equal('127.0.0.1')
       done()
     })
+
+    if (dialect === 'sqlite') {
+      it('should work with connection strings (1)', function () {
+        var sequelize = new Sequelize('sqlite://test.sqlite')
+      })
+      it('should work with connection strings (2)', function () {
+        var sequelize = new Sequelize('sqlite://test.sqlite/')
+      })
+      it('should work with connection strings (3)', function () {
+        var sequelize = new Sequelize('sqlite://test.sqlite/lol?reconnect=true')
+      })
+    }
   })
 
   if (dialect !== 'sqlite') {
@@ -50,9 +62,43 @@ describe(Support.getTestDialectTeaser("Sequelize"), function () {
         })
       })
 
+      describe('with an invalid connection', function() {
+        beforeEach(function() {
+          var options = _.extend({}, this.sequelize.options, { port: "99999" })
+          this.sequelizeWithInvalidConnection = new Sequelize("wat", "trololo", "wow", options)
+        })
+
+        it('triggers the error event', function(done) {
+          this
+            .sequelizeWithInvalidConnection
+            .authenticate()
+            .complete(function(err, result) {
+              expect(err).to.not.be.null
+              done()
+            })
+        })
+
+        it('triggers the actual adapter error', function(done) {
+          this
+            .sequelizeWithInvalidConnection
+            .authenticate()
+            .complete(function(err, result) {
+              if (dialect === 'mariadb') {
+                expect(err.message).to.match(/Access denied for user/)
+              } else if (dialect === 'postgres') {
+                expect(err.message).to.match(/invalid port number/)
+              } else {
+                expect(err.message).to.match(/Failed to authenticate/)
+              }
+
+              done()
+            })
+        })
+      })
+
       describe('with invalid credentials', function() {
         beforeEach(function() {
-          this.sequelizeWithInvalidCredentials = new Sequelize("omg", "wtf", "lol", this.sequelize.options)
+          this.sequelizeWithInvalidCredentials = new Sequelize("localhost", "wtf", "lol", this.sequelize.options)
         })
 
         it('triggers the error event', function(done) {
@@ -64,6 +110,28 @@ describe(Support.getTestDialectTeaser("Sequelize"), function () {
               done()
             })
         })
+
+        it('triggers the error event when using replication', function (done) {
+          new Sequelize('sequelize', null, null, {
+            replication: {
+              read: {
+                host: 'localhost',
+                username: 'omg',
+                password: 'lol'
+              }
+            }
+          }).authenticate()
+            .complete(function(err, result) {
+              expect(err).to.not.be.null
+              done()
+            })
+        })
+      })
+    })
+
+    describe('validate', function() {
+      it('is an alias for .authenticate()', function() {
+        expect(this.sequelize.validate).to.equal(this.sequelize.authenticate)
       })
     })
   }
@@ -207,7 +275,7 @@ describe(Support.getTestDialectTeaser("Sequelize"), function () {
       var self = this
       self.sequelize.query(this.insertQuery).success(function() {
         self.sequelize.query("SELECT * FROM " + qq(self.User.tableName) + ";", self.User).success(function(users) {
-          expect(users[0].__factory).to.equal(self.User)
+          expect(users[0].Model).to.equal(self.User)
           done()
         })
       })
@@ -397,14 +465,15 @@ describe(Support.getTestDialectTeaser("Sequelize"), function () {
     })
 
     if (dialect !== "sqlite") {
-      it("fails with incorrect database credentials", function(done) {
-        this.sequelizeWithInvalidCredentials = new Sequelize("omg", "bar", null, this.sequelize.options)
+      it("fails with incorrect database credentials (1)", function(done) {
+        this.sequelizeWithInvalidCredentials = new Sequelize("omg", "bar", null, _.omit(this.sequelize.options, ['host']))
 
         var User2 = this.sequelizeWithInvalidCredentials.define('User', { name: DataTypes.STRING, bio: DataTypes.TEXT })
 
         User2.sync().error(function(err) {
           if (dialect === "postgres" || dialect === "postgres-native") {
             assert([
+              'fe_sendauth: no password supplied',
               'role "bar" does not exist',
               'FATAL:  role "bar" does not exist',
               'password authentication failed for user "bar"'
@@ -414,6 +483,90 @@ describe(Support.getTestDialectTeaser("Sequelize"), function () {
           }
           done()
         })
+      })
+
+      it('fails with incorrect database credentials (2)', function (done) {
+        var sequelize = new Sequelize('db', 'user', 'pass', {
+          dialect: this.sequelize.options.dialect
+        });
+
+        var Project = sequelize.define('Project', {title: Sequelize.STRING})
+        var Task = sequelize.define('Task', {title: Sequelize.STRING})
+
+        sequelize.sync({force: true}).done(function (err) {
+          expect(err).to.be.ok
+          done()
+        })
+      })
+
+      it('fails with incorrect database credentials (3)', function (done) {
+        var sequelize = new Sequelize('db', 'user', 'pass', {
+          dialect: this.sequelize.options.dialect,
+          port: 99999
+        });
+
+        var Project = sequelize.define('Project', {title: Sequelize.STRING})
+        var Task = sequelize.define('Task', {title: Sequelize.STRING})
+
+        sequelize.sync({force: true}).done(function (err) {
+          expect(err).to.be.ok
+          done()
+        })
+      })
+
+      it('fails with incorrect database credentials (4)', function (done) {
+        var sequelize = new Sequelize('db', 'user', 'pass', {
+          dialect: this.sequelize.options.dialect,
+          port: 99999,
+          pool: {}
+        });
+
+        var Project = sequelize.define('Project', {title: Sequelize.STRING})
+        var Task = sequelize.define('Task', {title: Sequelize.STRING})
+
+        sequelize.sync({force: true}).done(function (err) {
+          expect(err).to.be.ok
+          done()
+        })
+      })
+
+      it('returns an error correctly if unable to sync a foreign key referenced model', function (done) {
+        var Application = this.sequelize.define('Application', {
+          authorID: { type: Sequelize.BIGINT, allowNull: false, references: 'User', referencesKey: 'id' },
+        })
+
+        this.sequelize.sync().error(function (error) {
+          assert.ok(error);
+          done()
+        })
+      })
+
+      it('handles self dependant foreign key constraints', function (done) {
+        var block = this.sequelize.define("block", {
+          id: { type: DataTypes.INTEGER, primaryKey: true },
+          name: DataTypes.STRING
+        }, {
+          tableName: "block",
+          timestamps: false,
+          paranoid: false
+        });
+
+        block.hasMany(block, {
+          as: 'childBlocks',
+          foreignKey: 'parent',
+          joinTableName: 'link_block_block',
+          useJunctionTable: true,
+          foreignKeyConstraint: true
+        });
+        block.belongsTo(block, {
+          as: 'parentBlocks',
+          foreignKey: 'child',
+          joinTableName: 'link_block_block',
+          useJunctionTable: true,
+          foreignKeyConstraint: true
+        });
+
+        this.sequelize.sync().done(done)
       })
     }
 
@@ -523,7 +676,8 @@ describe(Support.getTestDialectTeaser("Sequelize"), function () {
 
         it("doesn't save an instance if value is not in the range of enums", function(done) {
           this.Review.create({status: 'fnord'}).error(function(err) {
-            expect(err).to.deep.equal({ status: [ 'Value "fnord" for ENUM status is out of allowed scope. Allowed values: scheduled, active, finished' ] })
+            expect(err).to.be.instanceOf(Error);
+            expect(err.status).to.deep.equal([ 'Value "fnord" for ENUM status is out of allowed scope. Allowed values: scheduled, active, finished' ])
             done()
           })
         })
